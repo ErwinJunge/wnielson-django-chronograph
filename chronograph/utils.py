@@ -1,32 +1,30 @@
 from django.conf import settings
+from django.core.management import setup_environ
+from django.utils.importlib import import_module
+
+import os
+import re
 import subprocess
 
-MANAGE_PY = '/Users/wnielson/Projects/chronograph-daemon/project/manage.py'
-
-try:
-    import psutil
-    USE_PSUTIL = True
-except ImportError:
-    USE_PSUTIL = False
+def get_manage_py():
+    module = import_module(settings.SETTINGS_MODULE)
+    return os.path.join(setup_environ(module, settings.SETTINGS_MODULE), 'manage.py')
 
 def is_running(job):
     if job.is_running and job.pid is not None:
         # The Job thinks that it is running, so
-        # lets actually check, but only if psutil
-        # is available
-        if USE_PSUTIL:
-            try:
-                p = psutil.Process(job.pid)
-            except:
-                # The process with this pid doesn't
-                # exist, so this job isn't running
-                job.is_running = False
-                job.pid = None
-                job.save()
-                return False
-            # Now that we have a process, lets check to
-            # see if it is actually this Job's process
-            
+        # lets actually check
+        if os.name == 'posix':
+            # Try to use the 'ps' command to see if the process
+            # is still running
+            pid_re = re.compile(r'%d ([^\r\n]*)\n' % job.pid)
+            p = subprocess.Popen(["ps", "-eo", "pid args"], stdout=subprocess.PIPE)
+            p.wait()
+            for pname in pid_re.findall(p.stdout.read()):
+                # If we've gotten here, it means that we have a running process
+                # with this ``job.pid``.  Now we must check for the ``run_command``
+                # process with the given ``job.pk``
+                return pname.find('run_job %d' % job.pk) > -1
     return False
 
 def run_job(job, wait):
@@ -38,7 +36,7 @@ def run_job(job, wait):
     Returns the process, a ``subprocess.Popen`` instance.
     """
     if not is_running(job):
-        p = subprocess.Popen(['python', MANAGE_PY, 'run_job', str(job.id)])
+        p = subprocess.Popen(['python', get_manage_py(), 'run_job', str(job.id)])
         if wait:
             p.wait()
         return p
