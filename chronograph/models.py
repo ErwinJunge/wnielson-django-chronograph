@@ -1,12 +1,23 @@
+from django.contrib.auth.models import User
+from django.conf import settings
+from django.core.management import call_command
 from django.db import models
+from django.template import loader, Context
 from django.utils.timesince import timeuntil
 from django.utils.translation import ungettext, ugettext, ugettext_lazy as _
 from django.utils.encoding import smart_str
 
-from chronograph.utils import run_job
+from chronograph.utils import get_manage_py
+
+import os
+import re
+import subprocess
+import sys
+import traceback
 
 from datetime import datetime
 from dateutil import rrule
+from StringIO import StringIO
 
 class JobManager(models.Manager):
     def due(self):
@@ -40,6 +51,10 @@ class Job(models.Model):
     next_run = models.DateTimeField(_("next run"), blank=True, null=True, help_text=_("If you don't set this it will be determined automatically"))
     last_run = models.DateTimeField(_("last run"), editable=False, blank=True, null=True)
     is_running = models.BooleanField(default=False, editable=False)
+    last_run_successful = models.BooleanField(default=True, blank=False, null=False, editable=False)
+    subscribers = models.ManyToManyField(User, blank=True)
+    pid = models.IntegerField(blank=True, null=True, editable=False)
+    force_run = models.BooleanField(default=False)
     
     objects = JobManager()
     
@@ -124,15 +139,127 @@ class Job(models.Model):
                 args.append(arg)
         return (args, options)
     
+    def is_due(self):
+        reqs =  (self.next_run <= datetime.now() and self.disabled == False 
+                and self.is_running == False)
+        return (reqs or self.force_run)
+    
     def run(self, wait=True):
         """
-        Runs this ``Job``.  If ``save`` is ``True`` the dates (``last_run`` and ``next_run``)
-        are updated.  If ``save`` is ``False`` the job simply gets run and nothing changes.
+        Runs this ``Job``.  If ``wait`` is ``True`` any call to this function will not return
+        untill the ``Job`` is complete (or fails).  This actually calls the management command
+        ``run_job`` via a subprocess.  If you call this and want to wait for the process to
+        complete, pass ``wait=True``.
         
         A ``Log`` will be created if there is any output from either stdout or stderr.
+        
+        Returns the process, a ``subprocess.Popen`` instance, or None.
         """
         if not self.disabled:
-            return run_job(self, wait)
+            if not self.check_is_running() and self.is_due():
+                p = subprocess.Popen(['python', get_manage_py(), 'run_job', str(self.pk)])
+                if wait:
+                    p.wait()
+                return p
+        return None
+    
+    def handle_run(self):
+        """
+        This method implements the code to actually run a job.  This is meant to be run, primarily,
+        by the `run_job` management command as a subprocess, which can be invoked by calling
+        this job's ``run_job`` method.
+        """     
+        args, options = self.get_args()
+        stdout = StringIO()
+        stderr = StringIO()
+
+        # Redirect output so that we can log it if there is any
+        ostdout = sys.stdout
+        ostderr = sys.stderr
+        sys.stdout = stdout
+        sys.stderr = stderr
+        stdout_str, stderr_str = "", ""
+
+        run_date = datetime.now()
+        self.is_running = True
+        self.pid = os.getpid()
+        self.save()
+        
+        try:
+            call_command(self.command, *args, **options)
+            self.last_run_successful = True
+        except Exception, e:
+            # The command failed to run; log the exception
+            t = loader.get_template('chronograph/error_message.txt')
+            c = Context({
+              'exception': unicode(e),
+              'traceback': ['\n'.join(traceback.format_exception(*sys.exc_info()))]
+            })
+            stderr_str += t.render(c)
+            self.last_run_successful = False
+        
+        self.is_running = False
+        self.pid = None
+        self.last_run = run_date
+        
+        # If this was a forced run, then don't update the
+        # next_run date
+        if self.force_run:
+            self.force_run = False
+        else:
+            self.next_run = self.rrule.after(run_date)
+        self.save()
+
+        # If we got any output, save it to the log
+        stdout_str += stdout.getvalue()
+        stderr_str += stderr.getvalue()
+        if stdout_str or stderr_str:
+            log = Log.objects.create(
+                job = self,
+                run_date = run_date,
+                stdout = stdout_str,
+                stderr = stderr_str
+            )
+
+        # Redirect output back to default
+        sys.stdout = ostdout
+        sys.stderr = ostderr
+    
+    def check_is_running(self):
+        """
+        This function actually checks to ensure that a job is running.
+        Currently, it only supports `posix` systems.  On non-posix systems
+        it returns the value of this job's ``is_running`` field.
+        """
+        status = False
+        if self.is_running and self.pid is not None:
+            # The Job thinks that it is running, so
+            # lets actually check
+            if os.name == 'posix':
+                # Try to use the 'ps' command to see if the process
+                # is still running
+                pid_re = re.compile(r'%d ([^\r\n]*)\n' % self.pid)
+                p = subprocess.Popen(["ps", "-eo", "pid args"], stdout=subprocess.PIPE)
+                p.wait()
+                # If ``pid_re.findall`` returns a match it means that we have a
+                # running process with this ``self.pid``.  Now we must check for
+                # the ``run_command`` process with the given ``self.pk``
+                try:
+                    pname = pid_re.findall(p.stdout.read())[0]
+                except IndexError:
+                    pname = ''
+                if pname.find('run_job %d' % self.pk) > -1:
+                    # This Job is still running
+                    return True
+                else:
+                    # This job thinks it is running, but really isn't.
+                    self.is_running = False
+                    self.pid = None
+                    self.save()
+            else:
+                # TODO: add support for other OSes
+                return self.is_running
+        return False
 
 class Log(models.Model):
     """
@@ -142,9 +269,22 @@ class Log(models.Model):
     run_date = models.DateTimeField(auto_now_add=True)
     stdout = models.TextField(blank=True)
     stderr = models.TextField(blank=True)
+    success = models.BooleanField(default=True, editable=False)
         
     class Meta:
         ordering = ('-run_date',)
     
     def __unicode__(self):
         return u"%s - %s" % (self.job.name, self.run_date)
+    
+    def email_subscribers(self):
+            subscribers = []
+            for user in self.job.subscribers.all():
+                subscribers.append('"%s" <%s>' % (user.get_full_name(), user.email))
+
+            send_mail(
+                from_email = '"%s" <%s>' % (settings.EMAIL_SENDER, settings.EMAIL_HOST_USER),
+                subject = '%s' % self,
+                recipient_list = subscribers,
+                message = "Ouput:\n%s\nError output:\n%s" % (self.stdout, self.stderr)
+            )

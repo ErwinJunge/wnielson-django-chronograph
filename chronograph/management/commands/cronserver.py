@@ -26,14 +26,10 @@ class Command(BaseCommand):
             
             # Run server untill killed
             while True:
-                jobs = Job.objects.due()
-                if jobs.count() > 0:
-                    print "Running jobs:"
-                    for job in jobs:
-                        print "\t%s" % job
-                        job.run(False)
-                else:
-                    print "No jobs due."
+                for job in Job.objects.all():
+                    p = job.run(False)
+                    if p is not None:
+                        print "Running: %s" % job
                 sleep(t_wait)
         except KeyboardInterrupt:
             print "Exiting..."
