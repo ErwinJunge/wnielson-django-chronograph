@@ -19,6 +19,8 @@ from datetime import datetime
 from dateutil import rrule
 from StringIO import StringIO
 
+RRULE_WEEKDAY_DICT = {"MO":0,"TU":1,"WE":2,"TH":3,"FR":4,"SA":5,"SU":6}
+
 class JobManager(models.Manager):
     def due(self):
         """
@@ -105,6 +107,23 @@ class Job(models.Model):
         frequency = eval('rrule.%s' % self.frequency)
         return rrule.rrule(frequency, dtstart=self.last_run, **self.get_params())
     rrule = property(get_rrule)
+
+    def param_to_int(self, param_value):
+        """
+        Converts a valid rrule parameter to an integer if it is not already one, else
+        raises a ``ValueError``.  The following are equivalent:
+        
+            >>> job = Job(params = "byweekday:1,2,4,5")
+            >>> job = Job(params = "byweekday:TU,WE,FR,SA")
+        """
+        if param_value in RRULE_WEEKDAY_DICT:
+            return RRULE_WEEKDAY_DICT[param_value]
+        try:
+            val = int(param_value)
+        except ValueError:
+            raise ValueError('rrule parameter should be integer or weekday constant (e.g. MO, TU, etc.).  Error on: %s' % param_value)
+        else:
+            return val
     
     def get_params(self):
         """
@@ -117,9 +136,11 @@ class Job(models.Model):
         params = self.params.split(';')
         param_dict = []
         for param in params:
+            if param.strip() == "":
+                continue # skip blanks
             param = param.split(':')
             if len(param) == 2:
-                param = (str(param[0]), [int(p) for p in param[1].split(',')])
+                param = (str(param[0]).strip(), [self.param_to_int(p.strip()) for p in param[1].split(',')])
                 if len(param[1]) == 1:
                     param = (param[0], param[1][0])
                 param_dict.append(param)
