@@ -236,6 +236,12 @@ class Job(models.Model):
         # If we got any output, save it to the log
         stdout_str += stdout.getvalue()
         stderr_str += stderr.getvalue()
+        
+        if stderr_str:
+            # If anything was printed to stderr, consider the run
+            # unsuccessful
+            self.last_run_successful = False
+        
         if stdout_str or stderr_str:
             log = Log.objects.create(
                 job = self,
