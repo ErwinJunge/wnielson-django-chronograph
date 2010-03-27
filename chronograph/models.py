@@ -70,10 +70,12 @@ class Job(models.Model):
     
     def save(self, force_insert=False, force_update=False):
         if not self.disabled:
-            if not self.last_run:
-                self.last_run = datetime.now()
-            if not self.next_run:
-                self.next_run = self.rrule.after(self.last_run)
+            if self.pk:
+                j = Job.objects.get(pk=self.pk)
+            else:
+                j = self
+            if not self.next_run or j.params != self.params:
+                self.next_run = self.rrule.after(datetime.now())
         else:
             self.next_run = None
         
