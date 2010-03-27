@@ -211,5 +211,9 @@ class LogAdmin(admin.ModelAdmin):
         
         return super(LogAdmin, self).formfield_for_dbfield(db_field, **kwargs)
 
-admin.site.register(Job, JobAdmin)
+try:
+    admin.site.register(Job, JobAdmin)
+except admin.sites.AlreadyRegistered:
+    pass
+
 admin.site.register(Log, LogAdmin)
