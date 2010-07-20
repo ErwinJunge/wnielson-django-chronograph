@@ -28,7 +28,7 @@ If you're using `cron`, the following example can be added to your `crontab`::
 You're done!  Every minute ``cron`` will check to see if you have any pending jobs
 and if you do they'll be run.  No more mucking about with your ``crontab``.
 
-If you have a more complicated setup where ``manange.py`` might not work by default
+If you have a more complicated setup where ``manage.py`` might not work by default
 see the section below on installing ``chronograph`` in a virtual environment.
 
 
