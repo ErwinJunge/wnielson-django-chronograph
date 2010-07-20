@@ -54,7 +54,7 @@ class Job(models.Model):
     last_run = models.DateTimeField(_("last run"), editable=False, blank=True, null=True)
     is_running = models.BooleanField(default=False, editable=False)
     last_run_successful = models.BooleanField(default=True, blank=False, null=False, editable=False)
-    subscribers = models.ManyToManyField(User, blank=True)
+    subscribers = models.ManyToManyField(User, blank=True, limit_choices_to={'is_staff':True})
     pid = models.IntegerField(blank=True, null=True, editable=False)
     force_run = models.BooleanField(default=False)
     
