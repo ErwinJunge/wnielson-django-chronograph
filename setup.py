@@ -1,5 +1,5 @@
-import shutil, os, re
-from setuptools import setup, find_packages
+import os
+from distutils.core import setup
 
 app_name = 'django-chronograph'
 
@@ -40,38 +40,38 @@ def fullsplit(path, result=None):
         return result
     return fullsplit(head, [tail] + result)
 
+# Compile the list of packages available, because distutils doesn't have
+# an easy way to do this.
 packages, data_files = [], []
 root_dir = os.path.dirname(__file__)
-if not root_dir:
-    root_dir = '.'
+if root_dir:
+    os.chdir(root_dir)
 
-src_dir = os.path.join(root_dir, app_name)
-pieces = fullsplit(root_dir)
-if pieces[-1] == '':
-    len_root_dir = len(pieces) - 1
-else:
-    len_root_dir = len(pieces)
-
-for dirpath, dirnames, filenames in os.walk(src_dir):
+for dirpath, dirnames, filenames in os.walk('chronograph'):
     # Ignore dirnames that start with '.'
     for i, dirname in enumerate(dirnames):
-        if dirname.startswith('.'):
-            del dirnames[i]
-    #if 'conf' in dirpath:
-    #    print dirpath
-    if '__init__.py' in filenames and not 'conf' in dirpath:
-        packages.append('.'.join(fullsplit(dirpath)[len_root_dir:]))
+        if dirname.startswith('.'): del dirnames[i]
+    if '__init__.py' in filenames:
+        pkg = dirpath.replace(os.path.sep, '.')
+        if os.path.altsep:
+            pkg = pkg.replace(os.path.altsep, '.')
+        packages.append(pkg)
     elif filenames:
-        data_files.append([dirpath, [os.path.join(dirpath, f) for f in filenames]])
+        prefix = dirpath[12:] # Strip "chronograph/" or "chronograph\"
+        for f in filenames:
+            data_files.append(os.path.join(prefix, f))
+
+print data_files
 
 setup(
     name=app_name,
-    version=get_svn_revision(root_dir),
+    version="0.2",
     description='Django chronograph application.',
     author='Weston Nielson',
     author_email='wnielson@gmail.com',
+    url="https://bitbucket.org/wnielson/django-chronograph",
+    package_dir={'chronograph':'chronograph'},
     packages = packages,
-    data_files = data_files,
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Environment :: Web Environment',
@@ -81,7 +81,5 @@ setup(
         'Programming Language :: Python',
         'Framework :: Django',
     ],
-    include_package_data=True,
-    zip_safe=False,
-    install_requires=['setuptools'],
+    package_data={'chronograph': data_files}
 )
