@@ -9,7 +9,6 @@ class RunJobURLNode(template.Node):
         
     def render(self, context):
         object_id = self.object_id.resolve(context)
-        print object_id
         try:
             # Old way
             url = reverse('chronograph_job_run', args=(object_id,))
