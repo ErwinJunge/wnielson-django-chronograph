@@ -158,7 +158,8 @@ class JobAdmin(admin.ModelAdmin):
                 
             kwargs['widget'] = forms.widgets.Select(choices=choices)
             return db_field.formfield(**kwargs)
-            
+        
+        kwargs['request'] = request
         return super(JobAdmin, self).formfield_for_dbfield(db_field, **kwargs)
 
 class LogAdmin(admin.ModelAdmin):
