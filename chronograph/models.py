@@ -19,7 +19,7 @@ import tempfile
 import time
 import traceback
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil import rrule
 from StringIO import StringIO
 from threading import Thread
@@ -79,6 +79,8 @@ class JobHeartbeatThread(Thread):
         Call this to stop the heartbeat.
         """
         self.halt = True
+        while self.is_alive():
+            time.sleep(.1)
         self.lock_file.close()
 
 class Job(models.Model):
@@ -123,7 +125,7 @@ class Job(models.Model):
             return _(u"%(name)s - disabled") % {'name': self.name}
         return u"%s - %s" % (self.name, self.timeuntil)
     
-    def save(self, force_insert=False, force_update=False):
+    def save(self, *args, **kwargs):
         if not self.disabled:
             if self.pk:
                 j = Job.objects.get(pk=self.pk)
@@ -135,12 +137,17 @@ class Job(models.Model):
         else:
             self.next_run = None
         
-        super(Job, self).save(force_insert, force_update)
+        super(Job, self).save(*args, **kwargs)
 
     def get_timeuntil(self):
         """
         Returns a string representing the time until the next
-        time this Job will be run.
+        time this Job will be run (actually, the "string" returned
+        is really an instance of ``ugettext_lazy``).
+        
+        >>> job = Job(next_run=datetime.now())
+        >>> job.get_timeuntil().translate('en')
+        u'due'
         """
         if self.disabled:
             return _('never (disabled)')
@@ -162,7 +169,19 @@ class Job(models.Model):
     
     def get_rrule(self):
         """
-        Returns the rrule objects for this Job.
+        Returns the rrule objects for this ``Job``.  Can also be accessed via the
+        ``rrule`` property of the ``Job``.
+        
+        # Every minute
+        >>> last_run = datetime(2011, 8, 4, 7, 19)
+        >>> job = Job(frequency="MINUTELY", params="interval:1", last_run=last_run)
+        >>> print job.get_rrule().after(last_run)
+        2011-08-04 07:20:00
+        
+        # Every 2 hours
+        >>> job = Job(frequency="HOURLY", params="interval:2", last_run=last_run)
+        >>> print job.get_rrule().after(last_run)
+        2011-08-04 09:19:00
         """
         frequency = eval('rrule.%s' % self.frequency)
         return rrule.rrule(frequency, dtstart=self.last_run, **self.get_params())
@@ -173,8 +192,13 @@ class Job(models.Model):
         Converts a valid rrule parameter to an integer if it is not already one, else
         raises a ``ValueError``.  The following are equivalent:
         
-            >>> job = Job(params = "byweekday:1,2,4,5")
-            >>> job = Job(params = "byweekday:TU,WE,FR,SA")
+        >>> job = Job(params = "byweekday:1,2,4,5")
+        >>> job.get_params()
+        {'byweekday': [1, 2, 4, 5]}
+        
+        >>> job = Job(params = "byweekday:TU,WE,FR,SA")
+        >>> job.get_params()
+        {'byweekday': [1, 2, 4, 5]}
         """
         if param_value in RRULE_WEEKDAY_DICT:
             return RRULE_WEEKDAY_DICT[param_value]
@@ -189,6 +213,8 @@ class Job(models.Model):
     
     def get_params(self):
         """
+        Converts a string of parameters into a dict.
+        
         >>> job = Job(params = "count:1;bysecond:1;byminute:1,2,4,5")
         >>> job.get_params()
         {'count': 1, 'byminute': [1, 2, 4, 5], 'bysecond': 1}
@@ -212,6 +238,10 @@ class Job(models.Model):
         """
         Processes the args and returns a tuple or (args, options) for passing
         to ``call_command``.
+        
+        >>> job = Job(args="arg1 arg2 kwarg1='some value'")
+        >>> job.get_args()
+        (['arg1', 'arg2', "value'"], {'kwarg1': "'some"})
         """
         args = []
         options = {}
@@ -224,8 +254,25 @@ class Job(models.Model):
         return (args, options)
     
     def is_due(self):
+        """
+        >>> job = Job(next_run=datetime.now())
+        >>> job.is_due()
+        True
+        
+        >>> job = Job(next_run=datetime.now()+timedelta(seconds=60))
+        >>> job.is_due()
+        False
+        
+        >>> job.force_run = True
+        >>> job.is_due()
+        True
+        
+        >>> job = Job(next_run=datetime.now(), disabled=True)
+        >>> job.is_due()
+        False
+        """
         reqs =  (self.next_run <= datetime.now() and self.disabled == False 
-                and self.is_running == False)
+                and self.check_is_running() == False)
         return (reqs or self.force_run)
     
     def run(self):

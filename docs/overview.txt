@@ -67,7 +67,7 @@ within the system's crontab::
 
 .. note::
 	This script is new and should be considered experimental.  Please report
-	any bugs to the `issue tracker`_
+	any bugs to the `issue tracker`_.
 
 	.. _issue tracker: http://bitbucket.org/wnielson/django-chronograph/issues
 
