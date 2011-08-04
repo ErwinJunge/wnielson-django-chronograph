@@ -8,7 +8,6 @@ from django.utils.translation import ungettext, ugettext, ugettext_lazy as _
 from django.utils.encoding import smart_str
 
 from chronograph.settings import LOCK_TIMEOUT
-from chronograph.utils import get_manage_py
 
 import logging
 import os
