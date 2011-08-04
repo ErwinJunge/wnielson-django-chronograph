@@ -36,7 +36,10 @@ setup(
     version = ".".join([str(i) for i in chronograph.VERSION]),
     packages = find_packages(),
     scripts = ['bin/chronograph'],
-    package_data = {'': ['docs/*.txt', 'docs/*.py']},
+    package_data = {
+        '': ['docs/*.txt', 'docs/*.py'],
+        'chronograph': ['templates/*.*', 'templates/*/*.*', 'templates/*/*/*.*', 'fixtures/*'],
+    },
     author = "Weston Nielson",
     author_email = "wnielson@gmail.com",
     description = "",
@@ -50,6 +53,7 @@ setup(
         'Programming Language :: Python',
         'Framework :: Django',
     ],
+    zip_safe = False,
     install_requires = get_reqs(["Django>=1.0", "python-dateutil<=1.5"]),
     dependency_links = ['http://labix.org/download/python-dateutil/python-dateutil-1.5.tar.gz']
 )
