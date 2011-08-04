@@ -1,4 +1,6 @@
 from django.core.management.base import BaseCommand
+
+import logging
 import sys
 
 class Command( BaseCommand ):

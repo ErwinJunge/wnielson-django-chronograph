@@ -13,5 +13,7 @@ you can add jobs.
 Installation and Usage
 ======================
 
-Read docs/overview.txt for more information, or build the documentation with
-Sphinx.
+Read docs/overview.txt for more information, build the documentation with
+Sphinx or view them online here_.
+
+.. _here: http://readthedocs.org/docs/django-chronograph/en/latest/overview.html

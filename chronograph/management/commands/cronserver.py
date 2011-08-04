@@ -1,36 +1,56 @@
 from django.core.management.base import BaseCommand
+from django.core.management import call_command
+from django.utils.translation import ugettext_lazy as _
+
 from chronograph.models import Job
 
+import logging
 import sys
 
-from time import sleep
+from datetime import datetime
+from time import sleep, time
+from threading import Thread
 
-help_text = '''
-Emulates a reoccurring cron call to run jobs at a specified interval.
-This is meant primarily for development use.
-'''
+logger = logging.getLogger('chronograph.commands.cronserver')
+
+class CronThread(Thread):
+    daemon = True
+    
+    def run(self):
+        logger.info("Running due jobs...")
+        call_command('cron')
 
 class Command(BaseCommand):
-    help = help_text
     args = "time"
+    help = _("Emulates a reoccurring cron call to run jobs at a specified "
+             "interval.  This is meant primarily for development use.")
+    
     
     def handle( self, *args, **options ):
         from django.core.management import call_command
+        
+        logging.basicConfig(stream=sys.stdout, level=logging.INFO,
+                            datefmt="%Y-%m-%d %H:%M:%S",
+                            format="[%(asctime)-15s] %(message)s")
+        
         try:
-            t_wait = int(args[0])
+            time_wait = int(args[0])
         except:
-            t_wait = 60
+            time_wait = 60
+        
         try:
-            print "Starting cronserver.  Jobs will run every %d seconds." % t_wait
-            print "Quit the server with CONTROL-C."
+            sys.stdout.write("Starting cronserver.  Jobs will run every %d seconds.\n" % time_wait)
+            sys.stdout.write("Quit the server with CONTROL-C.\n")
+            
+            seconds = datetime.now().second
+            if seconds > 0:
+                sleep(60-seconds)
             
             # Run server untill killed
             while True:
-                for job in Job.objects.all():
-                    p = job.run(False)
-                    if p is not None:
-                        print "Running: %s" % job
-                sleep(t_wait)
+                thread = CronThread()
+                thread.start()
+                sleep(time_wait)
         except KeyboardInterrupt:
-            print "Exiting..."
+            logger.info("Exiting...\n")
             sys.exit()

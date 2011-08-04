@@ -7,26 +7,36 @@ from django.utils.timesince import timeuntil
 from django.utils.translation import ungettext, ugettext, ugettext_lazy as _
 from django.utils.encoding import smart_str
 
+from chronograph.settings import LOCK_TIMEOUT
 from chronograph.utils import get_manage_py
 
+import logging
 import os
 import re
 import subprocess
 import sys
+import tempfile
+import time
 import traceback
 
 from datetime import datetime
 from dateutil import rrule
 from StringIO import StringIO
+from threading import Thread
+
+logger = logging.getLogger('chronograph.models')
 
 RRULE_WEEKDAY_DICT = {"MO":0,"TU":1,"WE":2,"TH":3,"FR":4,"SA":5,"SU":6}
 
 class JobManager(models.Manager):
     def due(self):
         """
-        Returns a ``QuerySet`` of all jobs waiting to be run.
+        Returns a ``QuerySet`` of all jobs waiting to be run.  NOTE: this may
+        return ``Job``s that are still currently running; it is your
+        responsibility to call ``Job.check_is_running()`` to determine whether
+        or not the ``Job`` actually needs to be run.
         """
-        return self.filter(next_run__lte=datetime.now(), disabled=False, is_running=False)
+        return self.filter(next_run__lte=datetime.now(), disabled=False)
 
 # A lot of rrule stuff is from django-schedule
 freqs = (   ("YEARLY", _("Yearly")),
@@ -37,6 +47,40 @@ freqs = (   ("YEARLY", _("Yearly")),
             ("MINUTELY", _("Minutely")),
             ("SECONDLY", _("Secondly")))
 
+class JobHeartbeatThread(Thread):
+    """
+    A very simple thread that updates a temporary "lock" file every second.
+    If the ``Job`` that we are associated with gets killed off, then the file
+    will no longer be updated and after ``CHRONOGRAPH_LOCK_TIMEOUT`` seconds,
+    we assume the ``Job`` has terminated.
+    
+    The heartbeat should be started with the ``start`` method and once the
+    ``Job`` is completed it should be stopped by calling the ``stop`` method.
+    """
+    daemon = True
+    halt = False
+
+    def __init__(self, *args, **kwargs):
+        self.lock_file = tempfile.NamedTemporaryFile()
+        Thread.__init__(self, *args, **kwargs)
+
+    def run(self):
+        """
+        Do not call this directly; call ``start()`` instead.
+        """
+        while not self.halt:
+            self.lock_file.seek(0)
+            self.lock_file.write(str(time.time()))
+            self.lock_file.flush()
+            time.sleep(1)
+    
+    def stop(self):
+        """
+        Call this to stop the heartbeat.
+        """
+        self.halt = True
+        self.lock_file.close()
+
 class Job(models.Model):
     """
     A recurring ``django-admin`` command to be run.
@@ -44,18 +88,29 @@ class Job(models.Model):
     name = models.CharField(_("name"), max_length=200)
     frequency = models.CharField(_("frequency"), choices=freqs, max_length=10)
     params = models.TextField(_("params"), null=True, blank=True,
-        help_text=_('Comma-separated list of <a href="http://labix.org/python-dateutil" target="_blank">rrule parameters</a>. e.g: interval:15'))
-    command = models.CharField(_("command"), max_length=200,
-        help_text=_("A valid django-admin command to run."), blank=True)
+                              help_text=_('Comma-separated list of '
+                                          '<a href="http://labix.org/python-dateutil" '
+                                          'target="_blank">rrule parameters</a>. '
+                                          'e.g: interval:15'))
+    command = models.CharField(_("command"), max_length=200, blank=True,
+                               help_text=_("A valid django-admin command to "
+                                           "run."))
     args = models.CharField(_("args"), max_length=200, blank=True,
         help_text=_("Space separated list; e.g: arg1 option1=True"))
-    disabled = models.BooleanField(default=False, help_text=_('If checked this job will never run.'))
-    next_run = models.DateTimeField(_("next run"), blank=True, null=True, help_text=_("If you don't set this it will be determined automatically"))
-    last_run = models.DateTimeField(_("last run"), editable=False, blank=True, null=True)
+    disabled = models.BooleanField(default=False, help_text=_('If checked this '
+                                                              'job will never '
+                                                              'run.'))
+    next_run = models.DateTimeField(_("next run"), blank=True, null=True,
+                                    help_text=_("If you don't set this it will"
+                                                " be determined automatically"))
+    last_run = models.DateTimeField(_("last run"), editable=False, blank=True,
+                                    null=True)
     is_running = models.BooleanField(default=False, editable=False)
-    last_run_successful = models.BooleanField(default=True, blank=False, null=False, editable=False)
-    subscribers = models.ManyToManyField(User, blank=True, limit_choices_to={'is_staff':True})
-    pid = models.IntegerField(blank=True, null=True, editable=False)
+    last_run_successful = models.BooleanField(default=True, blank=False,
+                                              null=False, editable=False)
+    subscribers = models.ManyToManyField(User, blank=True,
+                                         limit_choices_to={'is_staff':True})
+    lock_file = models.CharField(max_length=255, blank=True, editable=False)
     force_run = models.BooleanField(default=False)
     
     objects = JobManager()
@@ -75,7 +130,8 @@ class Job(models.Model):
             else:
                 j = self
             if not self.next_run or j.params != self.params:
-                self.next_run = self.rrule.after(datetime.now())
+                logger.debug("Updating 'next_run")
+                self.next_run = self.rrule.after(self.next_run)
         else:
             self.next_run = None
         
@@ -92,6 +148,8 @@ class Job(models.Model):
         delta = self.next_run - datetime.now()
         if delta.days < 0:
             # The job is past due and should be run as soon as possible
+            if self.check_is_running():
+                return _('running')
             return _('due')
         elif delta.seconds < 60:
             # Adapted from django.utils.timesince
@@ -123,7 +181,9 @@ class Job(models.Model):
         try:
             val = int(param_value)
         except ValueError:
-            raise ValueError('rrule parameter should be integer or weekday constant (e.g. MO, TU, etc.).  Error on: %s' % param_value)
+            raise ValueError('rrule parameter should be integer or weekday '
+                             'constant (e.g. MO, TU, etc.).  '
+                             'Error on: %s' % param_value)
         else:
             return val
     
@@ -150,7 +210,8 @@ class Job(models.Model):
     
     def get_args(self):
         """
-        Processes the args and returns a tuple or (args, options) for passing to ``call_command``.
+        Processes the args and returns a tuple or (args, options) for passing
+        to ``call_command``.
         """
         args = []
         options = {}
@@ -167,30 +228,25 @@ class Job(models.Model):
                 and self.is_running == False)
         return (reqs or self.force_run)
     
-    def run(self, wait=True):
+    def run(self):
         """
-        Runs this ``Job``.  If ``wait`` is ``True`` any call to this function will not return
-        untill the ``Job`` is complete (or fails).  This actually calls the management command
-        ``run_job`` via a subprocess.  If you call this and want to wait for the process to
-        complete, pass ``wait=True``.
+        Runs this ``Job``.  A ``Log`` will be created if there is any output
+        from either stdout or stderr.
         
-        A ``Log`` will be created if there is any output from either stdout or stderr.
-        
-        Returns the process, a ``subprocess.Popen`` instance, or None.
+        Returns ``True`` if the ``Job`` ran, ``False`` otherwise.
         """
         if not self.disabled:
             if not self.check_is_running() and self.is_due():
-                p = subprocess.Popen(['python', get_manage_py(), 'run_job', str(self.pk)])
-                if wait:
-                    p.wait()
-                return p
-        return None
+                call_command('run_job', str(self.pk))
+                return True
+        return False
     
     def handle_run(self):
         """
-        This method implements the code to actually run a job.  This is meant to be run, primarily,
-        by the `run_job` management command as a subprocess, which can be invoked by calling
-        this job's ``run_job`` method.
+        This method implements the code to actually run a ``Job``.  This is
+        meant to be run, primarily, by the `run_job` management command as a
+        subprocess, which can be invoked by calling this ``Job``\'s ``run``
+        method.
         """     
         args, options = self.get_args()
         stdout = StringIO()
@@ -203,13 +259,19 @@ class Job(models.Model):
         sys.stderr = stderr
         stdout_str, stderr_str = "", ""
 
+        heartbeat = JobHeartbeatThread()
         run_date = datetime.now()
+        
         self.is_running = True
-        self.pid = os.getpid()
+        self.lock_file = heartbeat.lock_file.name
+        
         self.save()
         
+        heartbeat.start()
         try:
+            logger.debug("Calling command '%s'" % self.command)
             call_command(self.command, *args, **options)
+            logger.debug("Command '%s' completed" % self.command)
             self.last_run_successful = True
         except Exception, e:
             # The command failed to run; log the exception
@@ -221,16 +283,28 @@ class Job(models.Model):
             stderr_str += t.render(c)
             self.last_run_successful = False
         
+        # Stop the heartbeat
+        logger.debug("Stopping heartbeat")
+        heartbeat.stop()
+        heartbeat.join()
+        
         self.is_running = False
-        self.pid = None
-        self.last_run = run_date
+        self.lock_file = ""
+        
+        # Only care about minute-level resolution
+        self.last_run = datetime(run_date.year, run_date.month, run_date.day,
+                                 run_date.hour, run_date.minute)
         
         # If this was a forced run, then don't update the
         # next_run date
         if self.force_run:
+            logger.debug("Resetting 'force_run'")
             self.force_run = False
         else:
-            self.next_run = self.rrule.after(run_date)
+            logger.debug("Determining 'next_run'")
+            while self.next_run < datetime.now():
+                self.next_run = self.rrule.after(self.next_run)
+            logger.debug("'next_run = ' %s" % self.next_run)
         self.save()
 
         # If we got any output, save it to the log
@@ -260,35 +334,22 @@ class Job(models.Model):
         Currently, it only supports `posix` systems.  On non-posix systems
         it returns the value of this job's ``is_running`` field.
         """
-        status = False
-        if self.is_running and self.pid is not None:
-            # The Job thinks that it is running, so
-            # lets actually check
-            if os.name == 'posix':
-                # Try to use the 'ps' command to see if the process
-                # is still running
-                pid_re = re.compile(r'%d ([^\r\n]*)\n' % self.pid)
-                p = subprocess.Popen(["ps", "-eo", "pid args"], stdout=subprocess.PIPE)
-                p.wait()
-                # If ``pid_re.findall`` returns a match it means that we have a
-                # running process with this ``self.pid``.  Now we must check for
-                # the ``run_command`` process with the given ``self.pk``
-                try:
-                    pname = pid_re.findall(p.stdout.read())[0]
-                except IndexError:
-                    pname = ''
-                if pname.find('run_job %d' % self.pk) > -1:
-                    # This Job is still running
+        if self.is_running and self.lock_file:
+            # The Job thinks that it is running, so lets actually check
+            if os.path.exists(self.lock_file):
+                # The lock file exists, but if the file hasn't been modified
+                # in less than LOCK_TIMEOUT seconds ago, we assume the process
+                # is dead
+                if (time.time() - os.stat(self.lock_file).st_mtime) <= LOCK_TIMEOUT:
                     return True
-                else:
-                    # This job thinks it is running, but really isn't.
-                    self.is_running = False
-                    self.pid = None
-                    self.save()
-            else:
-                # TODO: add support for other OSes
-                return self.is_running
+            
+            # This job isn't running; update it's info
+            self.is_running = False
+            self.lock_file = ""
+            self.save()
         return False
+    check_is_running.short_description = "is running"
+    check_is_running.boolean = True
 
 class Log(models.Model):
     """
@@ -312,7 +373,8 @@ class Log(models.Model):
                 subscribers.append('"%s" <%s>' % (user.get_full_name(), user.email))
 
             send_mail(
-                from_email = '"%s" <%s>' % (settings.EMAIL_SENDER, settings.EMAIL_HOST_USER),
+                from_email = '"%s" <%s>' % (settings.EMAIL_SENDER,
+                                            settings.EMAIL_HOST_USER),
                 subject = '%s' % self,
                 recipient_list = subscribers,
                 message = "Ouput:\n%s\nError output:\n%s" % (self.stdout, self.stderr)

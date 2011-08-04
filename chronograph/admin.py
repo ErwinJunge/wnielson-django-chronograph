@@ -36,7 +36,7 @@ class HTMLWidget(forms.Widget):
 class JobAdmin(admin.ModelAdmin):
     actions = ['run_selected_jobs']
     list_display = ('name', 'last_run_with_link', 'get_timeuntil',
-                    'get_frequency',  'is_running', 'run_button', 'view_logs_button')
+                    'get_frequency',  'check_is_running', 'run_button', 'view_logs_button')
     list_display_links = ('name', )
     list_filter = ('last_run_successful', 'frequency', 'disabled')
     filter_horizontal = ('subscribers',)
