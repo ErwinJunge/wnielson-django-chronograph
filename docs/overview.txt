@@ -38,11 +38,23 @@ If you have a more complicated setup where ``manage.py`` might not work by
 default see the section below on installing ``chronograph`` in a virtual
 environment.
 
+.. versionadded:: 0.2.0
+	Added ``chronograph`` script
+
+If your project does not reside within your global python path then the above
+crontab snippet won't work.  Instead, ``django-chronograph`` now comes with a
+script called ``chronograph`` (located at :file:`bin/chronograph`) that
+provides an easy way to run all jobs that are due, like so::
+
+	/path/to/bin/chronograph -p /path/to/your/project
+
+For use in a virtual environment, see below.
+
 
 Within a Virtual Environment
 ----------------------------
 
-.. versionchanged:: 0.2.0
+.. versionadded:: 0.2.0
 	Added ``chronograph`` script
 
 When running ``setup.py`` a script named ``chronograph`` should get installed
@@ -51,7 +63,7 @@ call your ``django-chronograph`` jobs.  For extended usage information, see
 the output from the script.  Here is an example of how to use this script from
 within the system's crontab::
 
-	* * * * * /path/to/chronograph -e /path/to/ve/bin/activate_this.py -p /path/to/your/project
+	* * * * * /path/to/bin/chronograph -e /path/to/ve/bin/activate_this.py -p /path/to/your/project
 
 .. note::
 	This script is new and should be considered experimental.  Please report
