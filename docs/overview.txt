@@ -42,6 +42,27 @@ environment.
 Within a Virtual Environment
 ----------------------------
 
+.. versionchanged:: 0.2.0
+	Added ``chronograph`` script
+
+When running ``setup.py`` a script named ``chronograph`` should get installed
+into your ``bin`` directory.  This script is meant to make it really easy to
+call your ``django-chronograph`` jobs.  For extended usage information, see
+the output from the script.  Here is an example of how to use this script from
+within the system's crontab::
+
+	* * * * * /path/to/chronograph -e /path/to/ve/bin/activate_this.py -p /path/to/your/project
+
+.. note::
+	This script is new and should be considered experimental.  Please report
+	any bugs to the `issue tracker`_
+
+	.. _issue tracker: http://bitbucket.org/wnielson/django-chronograph/issues
+
+.. deprecated:: 0.2.0
+	``chronograph.sh`` has been removed.  Use ``chronograph`` instead (see
+	above).
+
 If you're using a virtual environment, setting up ``chronograph `` involves a
 bit more work, but not by much.  Included is a script called
 ``chronograph.sh``.  Copy this file to your project directory.
