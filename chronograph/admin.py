@@ -1,18 +1,20 @@
 from django import forms
 from django.conf.urls.defaults import patterns, url
 from django.contrib import admin
+from django.contrib import messages
 from django.core.management import get_commands
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
 from django.forms.util import flatatt
 from django.http import HttpResponseRedirect, Http404
 from django.template.defaultfilters import linebreaks
-from django.utils import dateformat
+from django.utils import formats
+from django.utils import timezone
 from django.utils.datastructures import MultiValueDict
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.text import capfirst
-from django.utils.translation import ungettext, get_date_formats, ugettext_lazy as _
+from django.utils.translation import ungettext, ugettext_lazy as _
 
 from chronograph.models import Job, Log
 
@@ -57,8 +59,7 @@ class JobAdmin(admin.ModelAdmin):
     search_fields = ('name', )
     
     def last_run_with_link(self, obj):
-        format = get_date_formats()[1]
-        value = capfirst(dateformat.format(obj.last_run, format))
+        value = capfirst(formats.localize(obj.last_run, use_l10n=True))
         
         try:
             log_id = obj.log_set.latest('run_date').id
@@ -76,8 +77,8 @@ class JobAdmin(admin.ModelAdmin):
     last_run_with_link.short_description = 'Last run'
     
     def get_timeuntil(self, obj):
-        format = get_date_formats()[1]
-        value = capfirst(dateformat.format(obj.next_run, format))
+        next_run = timezone.localtime(obj.next_run)
+        value = capfirst(formats.localize(next_run, use_l10n=True))
         return "%s<br /><span class='mini'>(%s)</span>" % (value, obj.get_timeuntil())
     get_timeuntil.admin_order_field = 'next_run'
     get_timeuntil.allow_tags = True
@@ -116,7 +117,7 @@ class JobAdmin(admin.ModelAdmin):
         # simply force the Job to be run by the next cron job
         job.force_run = True
         job.save()
-        request.user.message_set.create(message=_('The job "%(job)s" has been scheduled to run.') % {'job': job})        
+        messages.success(request, _('The job "%(job)s" was run successfully.') % {'job': job})
         if 'inline' in request.GET:
             redirect = request.path + '../../'
         else:
@@ -131,7 +132,8 @@ class JobAdmin(admin.ModelAdmin):
         return my_urls + urls
     
     def run_selected_jobs(self, request, queryset):
-        rows_updated = queryset.update(next_run=datetime.now())
+        now = timezone.make_aware(datetime.now(), timezone.get_default_timezone())
+        rows_updated = queryset.update(next_run=now)
         if rows_updated == 1:
             message_bit = "1 job was"
         else:
