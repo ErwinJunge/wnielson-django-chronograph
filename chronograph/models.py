@@ -39,13 +39,15 @@ class JobManager(models.Manager):
         return self.filter(next_run__lte=timezone.now(), disabled=False)
 
 # A lot of rrule stuff is from django-schedule
-freqs = (   ("YEARLY", _("Yearly")),
-            ("MONTHLY", _("Monthly")),
-            ("WEEKLY", _("Weekly")),
-            ("DAILY", _("Daily")),
-            ("HOURLY", _("Hourly")),
-            ("MINUTELY", _("Minutely")),
-            ("SECONDLY", _("Secondly")))
+freqs = (
+    ("YEARLY", _("Yearly")),
+    ("MONTHLY", _("Monthly")),
+    ("WEEKLY", _("Weekly")),
+    ("DAILY", _("Daily")),
+    ("HOURLY", _("Hourly")),
+    ("MINUTELY", _("Minutely")),
+    ("SECONDLY", _("Secondly"))
+)
 
 class JobHeartbeatThread(Thread):
     """
@@ -153,7 +155,8 @@ class Job(models.Model):
         time this Job will be run (actually, the "string" returned
         is really an instance of ``ugettext_lazy``).
         
-        >>> job = Job(next_run=datetime.now())
+        >>> from django.utils.timezone import now
+        >>> job = Job(next_run=now())
         >>> job.get_timeuntil().translate('en')
         u'due'
         """
@@ -263,11 +266,12 @@ class Job(models.Model):
     
     def is_due(self):
         """
-        >>> job = Job(next_run=datetime.now())
+        >>> from django.utils.timezone import now
+        >>> job = Job(next_run=now())
         >>> job.is_due()
         True
         
-        >>> job = Job(next_run=datetime.now()+timedelta(seconds=60))
+        >>> job = Job(next_run=now()+timedelta(seconds=60))
         >>> job.is_due()
         False
         
@@ -275,7 +279,7 @@ class Job(models.Model):
         >>> job.is_due()
         True
         
-        >>> job = Job(next_run=datetime.now(), disabled=True)
+        >>> job = Job(next_run=now(), disabled=True)
         >>> job.is_due()
         False
         """
@@ -377,7 +381,8 @@ class Job(models.Model):
                 job = self,
                 run_date = run_date,
                 stdout = stdout_str,
-                stderr = stderr_str
+                stderr = stderr_str,
+                success = self.last_run_successful
             )
 
         # Redirect output back to default

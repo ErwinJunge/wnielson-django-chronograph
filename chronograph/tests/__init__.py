@@ -74,7 +74,3 @@ class JobTestCase(TestCase):
         
         # Ensure that we have 0 Log objects
         self.assertEqual(Log.objects.count(), 0)
-        
-    
-        
-        
