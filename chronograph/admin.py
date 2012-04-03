@@ -165,7 +165,7 @@ class JobAdmin(admin.ModelAdmin):
         return super(JobAdmin, self).formfield_for_dbfield(db_field, **kwargs)
 
 class LogAdmin(admin.ModelAdmin):
-    list_display = ('job_name', 'run_date', 'job_success', 'output', 'errors', )
+    list_display = ('job_name', 'run_date', 'job_success', 'get_duration', 'output', 'errors', )
     search_fields = ('stdout', 'stderr', 'job__name', 'job__command')
     date_hierarchy = 'run_date'
     fieldsets = (
@@ -185,7 +185,18 @@ class LogAdmin(admin.ModelAdmin):
             return obj.success
     job_success.short_description = _(u'OK')
     job_success.boolean = True
-
+    
+    def get_duration(self, obj):
+        if obj.duration < 61:
+            return "%0.2f seconds" % obj.duration
+        elif (obj.duration/60) < 61:
+            return "%0.1f minutes" % (obj.duration/60)
+        elif (obj.duration/60/60) < 25:
+            return "%0.2f hours" % (obj.duration/60/60)
+        else:
+            return "%0.2f days" % (obj.duration/60/60/24)
+    get_duration.short_description = "duration"
+        
     def output(self, obj):
         result = obj.stdout or ''
         if len(result) > 40:

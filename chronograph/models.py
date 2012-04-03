@@ -347,6 +347,8 @@ class Job(models.Model):
         heartbeat.stop()
         heartbeat.join()
         
+        duration = (timezone.now()-run_date).total_seconds()
+        
         self.is_running = False
         self.lock_file = ""
         
@@ -382,7 +384,8 @@ class Job(models.Model):
                 run_date = run_date,
                 stdout = stdout_str,
                 stderr = stderr_str,
-                success = self.last_run_successful
+                success = self.last_run_successful,
+                duration = duration
             )
 
         # Redirect output back to default
@@ -421,6 +424,7 @@ class Log(models.Model):
     stdout = models.TextField(blank=True)
     stderr = models.TextField(blank=True)
     success = models.BooleanField(default=True, editable=False)
+    duration = models.FloatField(editable=False)
         
     class Meta:
         ordering = ('-run_date',)
