@@ -74,12 +74,18 @@ class JobAdmin(admin.ModelAdmin):
             return value
     last_run_with_link.admin_order_field = 'last_run'
     last_run_with_link.allow_tags = True
-    last_run_with_link.short_description = 'Last run'
+    last_run_with_link.short_description = _('Last run')
     
     def get_timeuntil(self, obj):
-        next_run = timezone.localtime(obj.next_run)
+        if obj.force_run:
+            next_run = timezone.localtime(datetime.now())
+            time_until = _("forced")
+        else:
+            next_run = timezone.localtime(obj.next_run)
+            time_until = obj.get_timeuntil()
+            
         value = capfirst(formats.localize(next_run, use_l10n=True))
-        return "%s<br /><span class='mini'>(%s)</span>" % (value, obj.get_timeuntil())
+        return "%s<br /><span class='mini'>(%s)</span>" % (value, time_until)
     get_timeuntil.admin_order_field = 'next_run'
     get_timeuntil.allow_tags = True
     get_timeuntil.short_description = _('next scheduled run')
@@ -90,7 +96,7 @@ class JobAdmin(admin.ModelAdmin):
             return "%s (%s)" % (freq, obj.params)
         return freq
     get_frequency.admin_order_field = 'frequency'
-    get_frequency.short_description = 'Frequency'
+    get_frequency.short_description = _('Frequency')
     
     
     def run_button(self, obj):
@@ -103,7 +109,7 @@ class JobAdmin(admin.ModelAdmin):
         on_click = "window.location='../log/?job=%d';" % obj.id
         return '<input type="button" onclick="%s" value="View Logs" />' % on_click
     view_logs_button.allow_tags = True
-    view_logs_button.short_description = 'Logs'
+    view_logs_button.short_description = _('Logs')
     
     def run_job_view(self, request, pk):
         """
@@ -113,11 +119,12 @@ class JobAdmin(admin.ModelAdmin):
             job = Job.objects.get(pk=pk)
         except Job.DoesNotExist:
             raise Http404
+        
         # Rather than actually running the Job right now, we
         # simply force the Job to be run by the next cron job
         job.force_run = True
         job.save()
-        messages.success(request, _('The job "%(job)s" was run successfully.') % {'job': job})
+        messages.success(request, _('The job "%(job)s" was set as forced.') % {'job': job})
         if 'inline' in request.GET:
             redirect = request.path + '../../'
         else:
@@ -132,14 +139,13 @@ class JobAdmin(admin.ModelAdmin):
         return my_urls + urls
     
     def run_selected_jobs(self, request, queryset):
-        now = timezone.make_aware(datetime.now(), timezone.get_default_timezone())
-        rows_updated = queryset.update(next_run=now)
+        rows_updated = queryset.update(force_run=True)
         if rows_updated == 1:
             message_bit = "1 job was"
         else:
             message_bit = "%s jobs were" % rows_updated
         self.message_user(request, "%s successfully set to run." % message_bit)
-    run_selected_jobs.short_description = "Run selected jobs"
+    run_selected_jobs.short_description = _("Run selected jobs")
     
     def formfield_for_dbfield(self, db_field, **kwargs):
         request = kwargs.pop("request", None)

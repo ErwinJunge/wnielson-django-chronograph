@@ -36,7 +36,7 @@ class JobManager(models.Manager):
         responsibility to call ``Job.check_is_running()`` to determine whether
         or not the ``Job`` actually needs to be run.
         """
-        return self.filter(next_run__lte=timezone.now(), disabled=False)
+        return self.filter(disabled=False).filter(models.Q(next_run__lte=timezone.now()) | models.Q(force_run=True))
 
 # A lot of rrule stuff is from django-schedule
 freqs = (
