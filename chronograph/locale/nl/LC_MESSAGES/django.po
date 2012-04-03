@@ -1,0 +1,245 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2012-02-24 16:42+0100\n"
+"PO-Revision-Date: 2012-03-08 12:03+0100\n"
+"Last-Translator: Max Hirschel <mhirschel@gmail.com>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1)\n"
+
+#: admin.py:47
+msgid "Can't specify a shell_command if a django admin command is already specified"
+msgstr "Je kunt geen shellcommanda geven als er al een djangocommando is gegeven"
+
+#: admin.py:55
+msgid "Must specify either command or shell command"
+msgstr "Je moet in ieder geval een commando of een shellcommando geven"
+
+#: admin.py:73
+msgid "Job Details"
+msgstr "Job details"
+
+#: admin.py:77
+msgid "E-mail subscriptions"
+msgstr "E-mailaanmeldingen"
+
+#: admin.py:81
+msgid "Frequency options"
+msgstr "Frequentie-instellingen"
+
+#: admin.py:108
+msgid "Last run"
+msgstr "Laatste keer uitgevoerd"
+
+#: admin.py:113
+#: admin.py:176
+msgid "OK"
+msgstr "OK"
+
+#: admin.py:120
+msgid "Run"
+msgstr "voer uit"
+
+#: admin.py:126
+msgid "Logs"
+msgstr "Logs"
+
+#: admin.py:137
+#, python-format
+msgid "The job \"%(job)s\" was run successfully."
+msgstr "De job \"%(job)s\" is succesvol uitgevoerd"
+
+#: admin.py:161
+msgid "Output"
+msgstr "Uitvoer"
+
+#: admin.py:168
+msgid "Duration"
+msgstr "Duratie"
+
+#: admin.py:172
+msgid "Name"
+msgstr "Naam"
+
+#: admin.py:184
+msgid "(No output)"
+msgstr "(Geen uitvoer)"
+
+#: admin.py:191
+msgid "(No errors)"
+msgstr "(Geen errors)"
+
+#: models.py:29
+msgid "Yearly"
+msgstr "Jaarlijks"
+
+#: models.py:30
+msgid "Monthly"
+msgstr "Maandelijks"
+
+#: models.py:31
+msgid "Weekly"
+msgstr "Wekelijks"
+
+#: models.py:32
+msgid "Daily"
+msgstr "Dagelijks"
+
+#: models.py:33
+msgid "Hourly"
+msgstr "Elk uur"
+
+#: models.py:34
+msgid "Minutely"
+msgstr "Elke minuut"
+
+#: models.py:35
+msgid "Secondly"
+msgstr "Elke seconde"
+
+#: models.py:41
+msgid "name"
+msgstr "naam"
+
+#: models.py:42
+msgid "frequency"
+msgstr "frequentie"
+
+#: models.py:43
+msgid "params"
+msgstr "parameters"
+
+#: models.py:45
+msgid "Semicolon separated list (no spaces) of <a href=\"http://labix.org/python-dateutil\" target=\"_blank\">rrule parameters</a>. e.g: interval:15 or byhour:6;byminute:40"
+msgstr "Een met puntkomma's (;) gescheiden lijst (zonder spaties) van <a href=\"http://labix.org/python-dateutil\" target=\"_blank\">rrule parameters</a>. bijv.: interval:15 of byhour:6;byminute:40"
+
+#: models.py:49
+msgid "command"
+msgstr "commando"
+
+#: models.py:50
+msgid "A valid django-admin command to run."
+msgstr "Een valide django-admin commando om uit te voeren"
+
+#: models.py:51
+msgid "shell command"
+msgstr "shellcommando"
+
+#: models.py:52
+msgid "A shell command."
+msgstr "Een shellcommando"
+
+#: models.py:53
+msgid "This command needs to run within a shell?"
+msgstr "Moet dit commando binnen een shell worden uitgevoerd?"
+
+#: models.py:54
+msgid "args"
+msgstr "args"
+
+#: models.py:55
+msgid "Space separated list; e.g: arg1 option1=True"
+msgstr "Spatiegescheiden lijst; bijv.: arg1 option1=True"
+
+#: models.py:56
+msgid "disabled"
+msgstr "uitgeschakeld"
+
+#: models.py:56
+msgid "If checked this job will never run."
+msgstr "Als dit vakje gecheckt is, wordt deze job nooit uitgevoerd"
+
+#: models.py:57
+msgid "next run"
+msgstr "volgende keer dat het wordt uitgevoerd"
+
+#: models.py:57
+msgid "If you don't set this it will be determined automatically"
+msgstr "Als je dit niet instelt, wordt het automatisch bepaald"
+
+#: models.py:58
+msgid "last run"
+msgstr "laatste keer uitgevoerd"
+
+#: models.py:59
+msgid "Running?"
+msgstr "in uitvoer?"
+
+#: models.py:62
+msgid "error subscribers"
+msgstr "error aanmeldingen"
+
+#: models.py:71
+#, python-format
+msgid "%(name)s - disabled"
+msgstr "%(name)s - uitgeschakeld"
+
+#: models.py:91
+msgid "never (disabled)"
+msgstr "nooit (uitgeschakeld)"
+
+#: models.py:96
+msgid "due"
+msgstr "op"
+
+#: models.py:99
+msgid "second"
+msgid_plural "seconds"
+msgstr[0] "seconde"
+msgstr[1] "seconden"
+
+#: models.py:100
+#, python-format
+msgid "%(number)d %(type)s"
+msgstr "%(number)d %(type)s"
+
+#: models.py:106
+msgid "time until next run"
+msgstr "tijd tot de volgende keer dat het wordt uitgevoerd"
+
+#: templates/admin/chronograph_bruens_it/job/change_form.html:6
+msgid "Changelog"
+msgstr "Veranderlog"
+
+#: templates/admin/chronograph_bruens_it/job/change_form.html:7
+msgid "View Logs"
+msgstr "Bekijk Logs"
+
+#: templates/admin/chronograph_bruens_it/job/change_form.html:8
+#: templates/admin/chronograph_bruens_it/log/change_list.html:10
+msgid "Run Job"
+msgstr "Voer Job uit"
+
+#: templates/admin/chronograph_bruens_it/job/change_form.html:11
+#: templates/admin/chronograph_bruens_it/log/change_form.html:8
+msgid "View on site"
+msgstr "Bekijk op site"
+
+#: templates/admin/chronograph_bruens_it/job/change_list.html:11
+#, python-format
+msgid "Add %(name)s"
+msgstr "Voeg %(name)s toe"
+
+#: templates/admin/chronograph_bruens_it/log/change_form.html:7
+msgid "History"
+msgstr "Geschiedenis"
+
+#: templates/admin/chronograph_bruens_it/log/change_form.html:18
+msgid "Please correct the error below."
+msgid_plural "Please correct the errors below."
+msgstr[0] "Herstel alsjeblieft onderstaande error"
+msgstr[1] "Herstel alsjeblieft onderstaande errors"
+
+#: templates/admin/chronograph_bruens_it/log/change_form.html:30
+msgid "Delete"
+msgstr "Verwijder"
+
