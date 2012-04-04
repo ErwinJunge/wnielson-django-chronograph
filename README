@@ -22,3 +22,7 @@ Read docs/overview.txt for more information, build the documentation with
 Sphinx or view them online here_.
 
 .. _here: http://readthedocs.org/docs/django-chronograph/en/latest/overview.html
+
+You can also grab the latest release from PyPI::
+
+	pip install django-chronograph
