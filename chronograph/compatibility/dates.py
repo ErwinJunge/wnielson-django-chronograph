@@ -49,7 +49,11 @@ def local_dateformat(dt):
     Returns a string representation of the given ``datetime`` ``dt``.
     """
     if formats:
-        return formats.localize(dt, use_l10n=True)
+        try:
+            return formats.localize(dt, use_l10n=True)
+        except TypeError:
+            # Django 1.2
+            return formats.localize(dt)
     return dateformat.format(dt, get_date_formats()[1])
 
 
