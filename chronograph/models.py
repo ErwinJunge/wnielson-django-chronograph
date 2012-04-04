@@ -4,7 +4,6 @@ from django.core.management import call_command
 from django.db import models
 from django.template import loader, Context
 from django.utils.timesince import timeuntil
-#from django.utils import timezone
 from django.utils.translation import ungettext, ugettext, ugettext_lazy as _
 from django.utils.encoding import smart_str
 

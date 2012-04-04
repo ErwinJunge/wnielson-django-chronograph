@@ -8,8 +8,8 @@ Installing ``chronograph`` is pretty simple.  First add it into
 
 .. note::
 
-  As of version 0.3, ``chronograph`` is only compatible with Django versions
-  >= 1.4.
+  As of version 0.3.1, ``chronograph`` is only compatible with Django versions
+  >= 1.1.
 
 After this run ``syncdb``.  The only thing left to do is set up a periodic call
 to run the jobs.
