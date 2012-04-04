@@ -1,21 +1,19 @@
 from django import forms
 from django.conf.urls.defaults import patterns, url
 from django.contrib import admin
-from django.contrib import messages
 from django.core.management import get_commands
 from django.core.urlresolvers import reverse, NoReverseMatch
 from django.db import models
 from django.forms.util import flatatt
 from django.http import HttpResponseRedirect, Http404
 from django.template.defaultfilters import linebreaks
-from django.utils import formats
-from django.utils import timezone
 from django.utils.datastructures import MultiValueDict
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.text import capfirst
 from django.utils.translation import ungettext, ugettext_lazy as _
 
+from chronograph.compatibility import dates
 from chronograph.models import Job, Log
 
 from datetime import datetime
@@ -59,7 +57,7 @@ class JobAdmin(admin.ModelAdmin):
     search_fields = ('name', )
     
     def last_run_with_link(self, obj):
-        value = capfirst(formats.localize(obj.last_run, use_l10n=True))
+        value = capfirst(dates.local_dateformat(obj.last_run))
         
         try:
             log_id = obj.log_set.latest('run_date').id
@@ -78,13 +76,13 @@ class JobAdmin(admin.ModelAdmin):
     
     def get_timeuntil(self, obj):
         if obj.force_run:
-            next_run = timezone.localtime(datetime.now())
+            next_run = dates.localtime(datetime.now())
             time_until = _("forced")
         else:
-            next_run = timezone.localtime(obj.next_run)
+            next_run = dates.localtime(obj.next_run)
             time_until = obj.get_timeuntil()
             
-        value = capfirst(formats.localize(next_run, use_l10n=True))
+        value = capfirst(dates.local_dateformat(next_run))
         return "%s<br /><span class='mini'>(%s)</span>" % (value, time_until)
     get_timeuntil.admin_order_field = 'next_run'
     get_timeuntil.allow_tags = True
@@ -124,7 +122,7 @@ class JobAdmin(admin.ModelAdmin):
         # simply force the Job to be run by the next cron job
         job.force_run = True
         job.save()
-        messages.success(request, _('The job "%(job)s" was set as forced.') % {'job': job})
+        self.message_user(request, _('The job "%(job)s" was set as forced.') % {'job': job})
         if 'inline' in request.GET:
             redirect = request.path + '../../'
         else:
@@ -141,10 +139,10 @@ class JobAdmin(admin.ModelAdmin):
     def run_selected_jobs(self, request, queryset):
         rows_updated = queryset.update(force_run=True)
         if rows_updated == 1:
-            message_bit = "1 job was"
+            message_bit = _("1 job was")
         else:
-            message_bit = "%s jobs were" % rows_updated
-        self.message_user(request, "%s successfully set to run." % message_bit)
+            message_bit = _("%s jobs were") % rows_updated
+        self.message_user(request, _("%s successfully set to run.") % message_bit)
     run_selected_jobs.short_description = _("Run selected jobs")
     
     def formfield_for_dbfield(self, db_field, **kwargs):

@@ -4,10 +4,11 @@ from django.core.management import call_command
 from django.db import models
 from django.template import loader, Context
 from django.utils.timesince import timeuntil
-from django.utils import timezone
+#from django.utils import timezone
 from django.utils.translation import ungettext, ugettext, ugettext_lazy as _
 from django.utils.encoding import smart_str
 
+from chronograph.compatibility import dates
 from chronograph.settings import LOCK_TIMEOUT
 
 import logging
@@ -36,7 +37,7 @@ class JobManager(models.Manager):
         responsibility to call ``Job.check_is_running()`` to determine whether
         or not the ``Job`` actually needs to be run.
         """
-        return self.filter(disabled=False).filter(models.Q(next_run__lte=timezone.now()) | models.Q(force_run=True))
+        return self.filter(disabled=False).filter(models.Q(next_run__lte=dates.now()) | models.Q(force_run=True))
 
 # A lot of rrule stuff is from django-schedule
 freqs = (
@@ -138,12 +139,10 @@ class Job(models.Model):
                 
                 next_run = self.next_run
                 if not next_run:
-                    next_run = timezone.now()
-                if timezone.is_aware(next_run):
-                    next_run = timezone.make_naive(next_run, timezone.utc)
+                    next_run = dates.now()
+                next_run = dates.make_naive(next_run)
                 
-                self.next_run = timezone.make_aware(self.rrule.after(next_run),
-                                                    timezone.utc)
+                self.next_run = dates.make_aware(self.rrule.after(next_run))
         else:
             self.next_run = None
         
@@ -155,7 +154,7 @@ class Job(models.Model):
         time this Job will be run (actually, the "string" returned
         is really an instance of ``ugettext_lazy``).
         
-        >>> from django.utils.timezone import now
+        >>> from chronograph.compatibility.dates import now
         >>> job = Job(next_run=now())
         >>> job.get_timeuntil().translate('en')
         u'due'
@@ -163,7 +162,7 @@ class Job(models.Model):
         if self.disabled:
             return _('never (disabled)')
         
-        delta = self.next_run - timezone.now()
+        delta = self.next_run - dates.now()
         if delta.days < 0:
             # The job is past due and should be run as soon as possible
             if self.check_is_running():
@@ -266,7 +265,7 @@ class Job(models.Model):
     
     def is_due(self):
         """
-        >>> from django.utils.timezone import now
+        >>> from chronograph.compatibility.dates import now
         >>> job = Job(next_run=now())
         >>> job.is_due()
         True
@@ -283,7 +282,7 @@ class Job(models.Model):
         >>> job.is_due()
         False
         """
-        reqs =  (self.next_run <= timezone.now() and self.disabled == False 
+        reqs =  (self.next_run <= dates.now() and self.disabled == False 
                 and self.check_is_running() == False)
         return (reqs or self.force_run)
     
@@ -319,7 +318,7 @@ class Job(models.Model):
         stdout_str, stderr_str = "", ""
 
         heartbeat = JobHeartbeatThread()
-        run_date = timezone.now()
+        run_date = dates.now()
         
         self.is_running = True
         self.lock_file = heartbeat.lock_file.name
@@ -347,14 +346,14 @@ class Job(models.Model):
         heartbeat.stop()
         heartbeat.join()
         
-        duration = (timezone.now()-run_date).total_seconds()
+        duration = (dates.now()-run_date).total_seconds()
         
         self.is_running = False
         self.lock_file = ""
         
         # Only care about minute-level resolution
-        self.last_run = timezone.make_aware(datetime(run_date.year, run_date.month, run_date.day,
-                                 run_date.hour, run_date.minute), timezone.utc)
+        self.last_run = dates.make_aware(datetime(run_date.year, run_date.month, run_date.day,
+                                 run_date.hour, run_date.minute))
         
         # If this was a forced run, then don't update the
         # next_run date
@@ -363,9 +362,8 @@ class Job(models.Model):
             self.force_run = False
         else:
             logger.debug("Determining 'next_run'")
-            while self.next_run < timezone.now():
-                self.next_run = timezone.make_aware(self.rrule.after(self.next_run),
-                                                        timezone.utc)
+            while self.next_run < dates.now():
+                self.next_run = dates.make_aware(self.rrule.after(self.next_run))
             logger.debug("'next_run = ' %s" % self.next_run)
         self.save()
 
