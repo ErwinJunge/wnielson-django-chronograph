@@ -48,6 +48,7 @@ def convert_timezone(dt, tz='utc'):
     # issues caused by daylight savings time.
     if hasattr(tzobj, 'normalize'):
         dt = tzobj.normalize(dt)
+    return dt
 
 def make_naive(dt, tz='utc'):
     if timezone:
@@ -78,7 +79,7 @@ def local_dateformat(dt):
 
 
 def localtime(dt):
-    if timezone:
+    if timezone and dt != None:
         return timezone.localtime(dt)
     return dt
 
