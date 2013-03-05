@@ -1,3 +1,4 @@
+from __future__ import division
 from datetime import datetime
 
 try:
@@ -23,16 +24,30 @@ def now():
         return timezone.now()
     return datetime.now()
 
-def get_tz_date(dt, meth, tz):
+def get_timezone(tz):
     if timezone:
         tz = tz.lower()
         if tz == 'utc':
-            dt = meth(dt, timezone.utc)
+            return timezone.utc
         elif tz == 'default':
-            dt = meth(dt, timezone.get_default_timezone())
+            return timezone.get_default_timezone()
         elif tz == 'current':
-            dt = meth(dt, timezone.get_current_timezone())
+            return timezone.get_current_timezone()
+    return None
+
+def get_tz_date(dt, meth, tz):
+    if timezone:
+        tzobj = get_timezone(tz)
+        dt = meth(dt, tzobj)
     return dt
+
+def convert_timezone(dt, tz='utc'):
+    tzobj = get_timezone(tz)
+    dt = dt.astimezone(tzobj)
+    # pytz time zones have a normalize function that will fix certain 
+    # issues caused by daylight savings time.
+    if hasattr(tzobj, 'normalize'):
+        dt = tzobj.normalize(dt)
 
 def make_naive(dt, tz='utc'):
     if timezone:
@@ -41,7 +56,12 @@ def make_naive(dt, tz='utc'):
 
 def make_aware(dt, tz='utc'):
     if timezone:
-        dt = get_tz_date(dt, timezone.make_aware, tz)
+        # If this timezone is already aware, just convert to the requested 
+        # timezone instead.
+        if dt.tzinfo != None:
+            dt = convert_timezone(dt, tz)
+        else:
+            dt = get_tz_date(dt, timezone.make_aware, tz)
     return dt
 
 def local_dateformat(dt):
@@ -61,3 +81,11 @@ def localtime(dt):
     if timezone:
         return timezone.localtime(dt)
     return dt
+
+def total_seconds(td):
+    # The timedelta.total_seconds() function was added in Python 2.7.
+    # If total_seconds() exists, use it.  Otherwise calculate manually.
+    if hasattr(td, 'total_seconds'):
+        return td.total_seconds()
+    else:
+        return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6

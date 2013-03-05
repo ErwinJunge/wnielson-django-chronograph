@@ -345,14 +345,14 @@ class Job(models.Model):
         heartbeat.stop()
         heartbeat.join()
         
-        duration = (dates.now()-run_date).total_seconds()
+        duration = dates.total_seconds(dates.now()-run_date)
         
         self.is_running = False
         self.lock_file = ""
         
         # Only care about minute-level resolution
-        self.last_run = dates.make_aware(datetime(run_date.year, run_date.month, run_date.day,
-                                 run_date.hour, run_date.minute))
+        self.last_run = dates.localtime(dates.make_aware(datetime(run_date.year, run_date.month, run_date.day,
+                                 run_date.hour, run_date.minute)))
         
         # If this was a forced run, then don't update the
         # next_run date

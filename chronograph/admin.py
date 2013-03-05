@@ -1,5 +1,8 @@
 from django import forms
-from django.conf.urls.defaults import patterns, url
+try:
+    from django.conf.urls import patterns, url
+except ImportError: # Django < 1.4
+    from django.conf.urls.defaults import patterns, url
 from django.contrib import admin
 from django.core.management import get_commands
 from django.core.urlresolvers import reverse, NoReverseMatch
@@ -57,7 +60,7 @@ class JobAdmin(admin.ModelAdmin):
     search_fields = ('name', )
     
     def last_run_with_link(self, obj):
-        value = capfirst(dates.local_dateformat(obj.last_run))
+        value = capfirst(dates.local_dateformat(dates.localtime(obj.last_run)))
         
         try:
             log_id = obj.log_set.latest('run_date').id
@@ -76,7 +79,7 @@ class JobAdmin(admin.ModelAdmin):
     
     def get_timeuntil(self, obj):
         if obj.force_run:
-            next_run = dates.localtime(datetime.now())
+            next_run = dates.localtime(dates.now())
             time_until = _("forced")
         else:
             next_run = dates.localtime(obj.next_run)
