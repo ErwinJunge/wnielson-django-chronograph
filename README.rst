@@ -1,5 +1,7 @@
 .. -*- restructuredtext -*-
 
+This is a fork of the official django-chronograph located in bitbucket (https://bitbucket.org/wnielson/django-chronograph). It doesn't seem to be maintained, so I decided to fork and make it work with django 1.9.
+
 Chronograph
 ===========
 
@@ -13,7 +15,7 @@ you can add jobs.
 
 .. Note::
 
-	``django-chronograph`` supports Django 1.1+.
+	``django-chronograph`` supports Django 1.9+.
 
 Installation and Usage
 ======================
